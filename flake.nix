@@ -70,6 +70,21 @@
         push = pkgs.writeShellScriptBin "push" ''
           ${pkgs.lib.getBin self.packages.${system}.pull}/bin/pull --deploy-no-remote "$@"
         '';
+
+        ##
+        # "burn" the default image for use with terraform
+        ##
+        burn = pkgs.writeShellApplication {
+          name = "burn";
+          runtimeInputs = with pkgs; [
+            coreutils
+            nix
+          ];
+          text = ''
+            nix build .#images.default
+            ln -s "$(realpath ./result)" ./terraform/image
+          '';
+        };
       };
     });
 }
