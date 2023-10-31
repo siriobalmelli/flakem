@@ -1,10 +1,10 @@
 ##
-# dropflake: Lightweight deployment tooling for NixOS systems declared in Flakes
+# flakem (Flake to Machine): Lightweight tooling for NixOS systems declared in Flakes
 #
 # 2023 Sirio Balmelli
 ##
 {
-  description = "dropflake";
+  description = "flakem";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
@@ -25,28 +25,50 @@
         };
       in {
         ##
+        # "build here"
+        #
+        # Build '$1' locally.
+        # Really just a shortcut to not have to remember
+        # "nixosConfigurations.MACHINE.config.system.build.toplevel"
+        ##
+        here = pkgs.writeShellApplication {
+          name = "here";
+          runtimeInputs = with pkgs; [
+            nix
+          ];
+          text = ''
+            nix build .#nixosConfigurations."$1".config.system.build.toplevel
+          '';
+        };
+
+        ##
+        # "they pull"
+        #
         # Build '$1' on '$1' remote;
         # switch '$1' to built configuration;
         # collect garbage older than 15 days.
         #
         # $1: host name (or ssh alias) *and* nixosSystem name
         ##
-        deploy = pkgs.writeShellApplication {
-          name = "deploy";
+        pull = pkgs.writeShellApplication {
+          name = "pull";
           runtimeInputs = with pkgs; [
             nixos-rebuild
           ];
           text = builtins.readFile ./scripts/deploy.sh;
         };
+
         ##
+        # "we push"
+        #
         # Build '$1' locally;
         # switch '$1' to built configuration;
         # collect garbage older than 15 days.
         #
         # $1: host name (or ssh alias) *and* nixosSystem name
         ##
-        dropship = pkgs.writeShellScriptBin "dropship" ''
-          ${pkgs.lib.getBin self.packages.${system}.deploy}/bin/deploy --deploy-no-remote "$@"
+        push = pkgs.writeShellScriptBin "push" ''
+          ${pkgs.lib.getBin self.packages.${system}.pull}/bin/pull --deploy-no-remote "$@"
         '';
       };
     });
