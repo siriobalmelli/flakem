@@ -81,8 +81,26 @@
             nix
           ];
           text = ''
-            nix build .#images.default
-            ln -s "$(realpath ./result)" ./terraform/image
+            nix build --max-jobs auto --cores 0 .#images.default
+            ln -sf "$(realpath ./result)" ./terraform/image
+          '';
+        };
+
+        ##
+        # "cash" the last built derivation
+        ##
+        cash = pkgs.writeShellApplication {
+          name = "cash";
+          runtimeInputs = with pkgs; [
+            jq
+            nix
+          ];
+          text = ''
+            nix flake archive --json \
+              | jq -r '.path,(.inputs | to_entries[].value.path)' \
+              | cachix push "$@"
+            nix path-info --recursive ./result \
+              | cachix push "$@"
           '';
         };
       };

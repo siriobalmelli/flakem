@@ -30,7 +30,8 @@ fi
 
 # arguments
 ARGS+=( \
-	-j auto \
+	--max-jobs auto \
+	--cores 0 \
 	--target-host "$TARGET" \
 	--use-remote-sudo \
 	--use-substitutes \

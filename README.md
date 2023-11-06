@@ -21,6 +21,12 @@ It assumes that machine names are the same in both `flake.nix` and one of:
     # build locally, deploy remotely
     nix run github:siriobalmelli/flakem/master#push DESTINATION_HOST
 
+    # build .#images.default and link it to 'terraform/image'
+    nix run github:siriobalmelli/flakem/master#burn
+
+    # push the current './result' closure and all flake inputs to NIX_CACHE
+    nix run github:siriobalmelli/flakem/master#cash NIX_CACHE
+
 ### Include into a flake to deploy NixOS systems directly:
 
 ```nix
@@ -53,11 +59,7 @@ Then, from that flake's directory:
     # build and deploy remotely
     nix run .#pull DESTINATION_HOST
 
-    # build locally
-    nix run .#here DESTINATION_HOST
-
-    # build locally, deploy remotely
-    nix run .#push DESTINATION_HOST
+    # etc ...
 
 ## TODO
 
