@@ -72,7 +72,9 @@
         '';
 
         ##
-        # "burn" the default image for use with terraform
+        # "burn" the default image for use with terraform,
+        # creating a garbage collector root './terraform/image'
+        # which will not be clobbered when the next build overwrites './result'.
         ##
         burn = pkgs.writeShellApplication {
           name = "burn";
@@ -81,8 +83,7 @@
             nix
           ];
           text = ''
-            nix build --max-jobs auto --cores 0 .#images.default
-            ln -sf "$(realpath ./result)" ./terraform/image
+            nix build --out-link ./terraform/image --max-jobs auto --cores 0 .#images.default
           '';
         };
 
