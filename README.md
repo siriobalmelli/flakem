@@ -48,7 +48,7 @@ It assumes that machine names are the same in both `flake.nix` and one of:
   in
     eachDefaultSystem (system: {
       packages = {
-        inherit (flakem.packages.${system}) pull here push;
+        inherit (flakem.packages.${system}) pull here push burn cash;
       };
     });
 }

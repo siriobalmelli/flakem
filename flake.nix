@@ -37,7 +37,7 @@
             nix
           ];
           text = ''
-            nix build .#nixosConfigurations."$1".config.system.build.toplevel
+            nix build --show-trace .#nixosConfigurations."$1".config.system.build.toplevel
           '';
         };
 
@@ -83,7 +83,7 @@
             nix
           ];
           text = ''
-            nix build --out-link ./terraform/image --max-jobs auto --cores 0 .#images.default
+            nix build --show-trace --out-link ./terraform/image --max-jobs auto --cores 0 .#images.default
           '';
         };
 
