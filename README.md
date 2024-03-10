@@ -8,24 +8,35 @@ It assumes that machine names are the same in both `flake.nix` and one of:
 - DNS name
 - `host` string in SSH config
 
+It also assumes the target is already an installed NixOS system;
+if this is not the case, initial deployment can be done with
+[nixos-anywhere](https://github.com/nix-community/nixos-anywhere), eg:
+
+```bash
+nix run github:nix-community/nixos-anywhere -- \
+    --flake .#HOSTNAME --build-on-remote root@HOST_IP
+```
+
 ## Usage
 
 ### Run directly from git on a local flake directory:
 
-    # build and deploy remotely
-    nix run github:siriobalmelli/flakem/master#pull DESTINATION_HOST
+```bash
+# build and deploy remotely
+nix run github:siriobalmelli/flakem/master#pull DESTINATION_HOST
 
-    # build locally
-    nix run github:siriobalmelli/flakem/master#here DESTINATION_HOST
+# build locally
+nix run github:siriobalmelli/flakem/master#here DESTINATION_HOST
 
-    # build locally, deploy remotely
-    nix run github:siriobalmelli/flakem/master#push DESTINATION_HOST
+# build locally, deploy remotely
+nix run github:siriobalmelli/flakem/master#push DESTINATION_HOST
 
-    # build .#images.default and link it to 'terraform/image'
-    nix run github:siriobalmelli/flakem/master#burn
+# build .#images.default and link it to 'terraform/image'
+nix run github:siriobalmelli/flakem/master#burn
 
-    # push the current './result' closure and all flake inputs to NIX_CACHE
-    nix run github:siriobalmelli/flakem/master#cash NIX_CACHE
+# push the current './result' closure and all flake inputs to NIX_CACHE
+nix run github:siriobalmelli/flakem/master#cash NIX_CACHE
+```
 
 ### Include into a flake to deploy NixOS systems directly:
 
@@ -56,10 +67,12 @@ It assumes that machine names are the same in both `flake.nix` and one of:
 
 Then, from that flake's directory:
 
-    # build and deploy remotely
-    nix run .#pull DESTINATION_HOST
+```bash
+# build and deploy remotely
+nix run .#pull DESTINATION_HOST
 
-    # etc ...
+# etc ...
+```
 
 ## TODO
 
