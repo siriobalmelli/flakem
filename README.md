@@ -19,6 +19,8 @@ nix run github:nix-community/nixos-anywhere -- \
 
 ## Usage
 
+![diagram of flakem workflow](docs/workflow.svg)
+
 ### Run directly from git on a local flake directory:
 
 ```bash
@@ -33,9 +35,6 @@ nix run github:siriobalmelli/flakem/master#push DESTINATION_HOST
 
 # build .#images.default and link it to 'terraform/image'
 nix run github:siriobalmelli/flakem/master#burn
-
-# push the current './result' closure and all flake inputs to NIX_CACHE
-nix run github:siriobalmelli/flakem/master#cash NIX_CACHE
 ```
 
 ### Include into a flake to deploy NixOS systems directly:
@@ -59,7 +58,7 @@ nix run github:siriobalmelli/flakem/master#cash NIX_CACHE
   in
     eachDefaultSystem (system: {
       packages = {
-        inherit (flakem.packages.${system}) pull here push burn cash;
+        inherit (flakem.packages.${system}) pull here push burn;
       };
     });
 }
