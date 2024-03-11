@@ -49,7 +49,7 @@ nix run github:siriobalmelli/flakem/master#burn
     flakem = {
       url = "github:siriobalmelli/flakem";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
   };
 
