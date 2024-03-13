@@ -44,4 +44,5 @@ fi
 
 # run
 nixos-rebuild switch --fast --flake .#"${TARGET##*@}" "${ARGS[@]}"
-ssh -t "$TARGET" "sudo nix-collect-garbage --delete-older-than 15d"
+# seems to collect intermediate build artifacts for things deployed minutes ago
+# ssh -t "$TARGET" "sudo nix-collect-garbage --delete-older-than 15d"
