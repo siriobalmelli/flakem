@@ -43,6 +43,6 @@ if [ -z "$NO_REMOTE" ]; then
 fi
 
 # run
-nixos-rebuild switch --fast --flake .#"${TARGET##*@}" "${ARGS[@]}"
+nixos-rebuild switch --fast --flake ".?submodules=1#${TARGET##*@}" "${ARGS[@]}"
 # seems to collect intermediate build artifacts for things deployed minutes ago
 # ssh -t "$TARGET" "sudo nix-collect-garbage --delete-older-than 15d"
