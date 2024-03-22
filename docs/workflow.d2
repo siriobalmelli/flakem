@@ -1,29 +1,29 @@
 local: "local machine" {
 	repo: "repo + flake"
 	nix: "nix store" {
-		der: derivation
-		clr: build closure
+		sources
+		outputs
 	}
-	system: "system: NixOS || NixDarwin"
+	system: "system: NixOS"
 }
 local.style.fill: PapayaWhip
 local.style.stroke-width: 0
 
 remote: "remote machine" {
 	nix: "nix store" {
-		der: derivation
-		clr: build closure
+		sources
+		outputs
 	}
-	system: "system: NixOS || NixDarwin"
+	system: "system: NixOS"
 }
 remote.style.fill: PapayaWhip
 remote.style.stroke-width: 0
 
-local.repo -> local.nix.der -> local.nix.clr: "here || push\nbuild nix flake" { style.stroke: red }
+local.repo -> local.nix.sources: ALL
 
-local.nix -> local.system: "push LOCAL_HOST\nactivate machine profile" { style.stroke: orange }
-local.nix -> remote.nix.clr: "push REMOTE_HOST\ncopy nix closure" { style.stroke: orange }
+local.nix.sources -> local.nix.outputs: "build" { style.stroke: red }
+local.nix.sources -> remote.nix.sources -> remote.nix.outputs: "build-there" { style.stroke: orange }
 
-local.repo -> remote.nix.der -> remote.nix.clr: "pull REMOTE_HOST\nbuild nix flake on remote" { style.stroke: green }
-
-remote.nix -> remote.system: "push || pull REMOTE_HOST\nactivate machine profile" { style.stroke: purple }
+local.nix.sources -> local.nix.outputs -> local.system: "switch"
+local.nix.sources -> local.nix.outputs -> remote.nix.outputs -> remote.system: "switch-push" {style.stroke: green }
+local.nix.sources -> remote.nix.sources -> remote.nix.outputs -> remote.system: "switch-pull" {style.stroke: purple }

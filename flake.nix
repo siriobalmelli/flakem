@@ -23,70 +23,70 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-      in {
+        rebuildOpts = pkgs.lib.cli.toGNUCommandLineShell {} {
+          fast = true;
+          use-remote-sudo = true;
+          use-substitutes = true;
+        };
+        nixOpts = pkgs.lib.cli.toGNUCommandLineShell {} {
+          max-jobs = "auto";
+          cores = 0;
+        };
+        shellApp = name: commandLine: {
+          ${name} = pkgs.writeShellApplication {
+            inherit name;
+            runtimeInputs = with pkgs; [nixos-rebuild];
+            text = ''
+              set -x
+              ${commandLine}
+            '';
+          };
+        };
+      in
         ##
-        # "build here"
+        # All scripts take:
         #
-        # - build '$1' locally
-        #
-        # Really just a shortcut to not have to remember
-        # "nixosConfigurations.MACHINE.config.system.build.toplevel"
+        # $1      : user@machine:
+        #           user@machine  : stanza given to SSH for remote access
+        #           machine       : name of NixOS system declared in flake
+        # ${@:2}  : nix options
+        #           options passed to nix as-is
         ##
-        here = pkgs.writeShellApplication {
-          name = "here";
-          runtimeInputs = with pkgs; [
-            nix
-          ];
-          text = ''
-            nix build --show-trace .#nixosConfigurations."$1".config.system.build.toplevel
+        pkgs.lib.concatMapAttrs shellApp {
+          # build machine locally
+          "build" = ''
+            nixos-rebuild build \
+              ${rebuildOpts} --flake ".?submodules=1#''${1##*@}" \
+              ${nixOpts} "''${@:2}"
+          '';
+
+          # build machine remotely
+          "build-there" = ''
+            nixos-rebuild build \
+              ${rebuildOpts} --build-host "$1" --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
+              ${nixOpts} "''${@:2}"
+          '';
+
+          # build machine locally, apply locally
+          "switch" = ''
+            nixos-rebuild switch \
+              ${rebuildOpts} --flake ".?submodules=1#''${1##*@}" \
+              ${nixOpts} "''${@:2}"
+          '';
+
+          # build machine locally, apply remotely
+          "switch-push" = ''
+            nixos-rebuild switch \
+              ${rebuildOpts} --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
+              ${nixOpts} "''${@:2}"
+          '';
+
+          # build machine remotely, apply remotely
+          "switch-pull" = ''
+            nixos-rebuild switch \
+              ${rebuildOpts} --build-host "$1" --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
+              ${nixOpts} "''${@:2}"
           '';
         };
-
-        ##
-        # "they pull"
-        #
-        # - build '$1' on '$1' remote
-        # - switch '$1' to built configuration
-        # - collect garbage older than 15 days
-        #
-        # $1: host name (or ssh alias) *and* nixosSystem name
-        ##
-        pull = pkgs.writeShellApplication {
-          name = "pull";
-          runtimeInputs = with pkgs; [
-            nixos-rebuild
-          ];
-          text = builtins.readFile ./scripts/deploy.sh;
-        };
-
-        ##
-        # "we push"
-        #
-        # Build '$1' locally;
-        # switch '$1' to built configuration;
-        # collect garbage older than 15 days.
-        #
-        # $1: host name (or ssh alias) *and* nixosSystem name
-        ##
-        push = pkgs.writeShellScriptBin "push" ''
-          ${pkgs.lib.getBin self.packages.${system}.pull}/bin/pull --deploy-no-remote "$@"
-        '';
-
-        ##
-        # "burn" the default image for use with terraform,
-        # creating a garbage collector root './terraform/image'
-        # which will not be clobbered when the next build overwrites './result'.
-        ##
-        burn = pkgs.writeShellApplication {
-          name = "burn";
-          runtimeInputs = with pkgs; [
-            coreutils
-            nix
-          ];
-          text = ''
-            nix build --show-trace --out-link ./terraform/image --max-jobs auto --cores 0 .#images.default
-          '';
-        };
-      };
     });
 }
