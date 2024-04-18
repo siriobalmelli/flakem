@@ -37,7 +37,37 @@
             inherit name;
             runtimeInputs = with pkgs; [nixos-rebuild];
             text = ''
+              die() {
+                echo "$*" >&2
+                exit 1
+              }
+
+              DEPLOY_HOST=
+              FLAKE_TARGET=
+              NIX_OPTIONS=( )
+              while [ "$#" -gt 0 ]; do
+                if [ -z "$DEPLOY_HOST" ]; then
+                  DEPLOY_HOST="$1"
+                  shift
+                elif [ "''${1:0:1}" = "-" ]; then
+                  break;
+                elif [ -z "$FLAKE_TARGET" ]; then
+                  FLAKE_TARGET="$1"
+                  shift
+                else
+                  break
+                fi
+              done
+              [ -z "$DEPLOY_HOST" ] && die "no target given"
+              [ -z "$FLAKE_TARGET" ] && FLAKE_TARGET="''${DEPLOY_HOST##*@}"  # remove a leading 'user@' stanza
+              NIX_OPTIONS=("''${@:1}")  # any remaining options are nix options
+
+              # avoid unused variable warnings
+              export DEPLOY_HOST
+              export FLAKE_TARGET
+              export NIX_OPTIONS
               set -x
+
               ${commandLine}
             '';
           };
@@ -54,38 +84,41 @@
         ##
         pkgs.lib.concatMapAttrs shellApp {
           # build machine locally
+          # ... remember `'$` escape oddity
           "build" = ''
             nixos-rebuild build \
-              ${rebuildOpts} --flake ".?submodules=1#''${1##*@}" \
-              ${nixOpts} "''${@:2}"
+              ${rebuildOpts} --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine remotely
           "build-there" = ''
             nixos-rebuild build \
-              ${rebuildOpts} --build-host "$1" --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
-              ${nixOpts} "''${@:2}"
+              ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
+              --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine locally, apply locally
           "switch" = ''
             nixos-rebuild switch \
-              ${rebuildOpts} --flake ".?submodules=1#''${1##*@}" \
-              ${nixOpts} "''${@:2}"
+              ${rebuildOpts} --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine locally, apply remotely
           "switch-push" = ''
             nixos-rebuild switch \
-              ${rebuildOpts} --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
-              ${nixOpts} "''${@:2}"
+              ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine remotely, apply remotely
           "switch-pull" = ''
             nixos-rebuild switch \
-              ${rebuildOpts} --build-host "$1" --target-host "$1" --flake ".?submodules=1#''${1##*@}" \
-              ${nixOpts} "''${@:2}"
+              ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
+              --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
         };
     });
