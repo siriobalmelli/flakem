@@ -87,7 +87,7 @@
           # ... remember `'$` escape oddity
           "build" = ''
             nixos-rebuild build \
-              ${rebuildOpts} --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
@@ -95,21 +95,21 @@
           "build-there" = ''
             nixos-rebuild build \
               ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-              --flake ".?submodules=1#$FLAKE_TARGET" \
+              --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine locally, apply locally
           "switch" = ''
             nixos-rebuild switch \
-              ${rebuildOpts} --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
           # build machine locally, apply remotely
           "switch-push" = ''
             nixos-rebuild switch \
-              ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".?submodules=1#$FLAKE_TARGET" \
+              ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
@@ -117,7 +117,7 @@
           "switch-pull" = ''
             nixos-rebuild switch \
               ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-              --flake ".?submodules=1#$FLAKE_TARGET" \
+              --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
         };
