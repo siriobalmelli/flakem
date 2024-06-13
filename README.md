@@ -40,11 +40,20 @@ nix run github:siriobalmelli/flakem/master#build-there bigmachine  # can also be
 # build machine locally, apply locally
 nix run github:siriobalmelli/flakem/master#switch $(hostname)
 
+# build machine remotely, apply remotely
+nix run github:siriobalmelli/flakem/master#switch-pull myuser@bigmachine  # can also be 'bigmachine'
+
 # build machine locally, apply remotely
 nix run github:siriobalmelli/flakem/master#switch-push bigmachine  # can also be 'myuser@bigmachine'
 
-# build machine remotely, apply remotely
-nix run github:siriobalmelli/flakem/master#switch-pull myuser@bigmachine  # can also be 'bigmachine'
+# switch-pull, followed by a reboot and a nix-collect-garbage
+nix run github:siriobalmelli/flakem/master#switch-pull-reset root@10.3.2.1 another-machine
+
+# switch-push, followed by a reboot and a nix-collect-garbage
+nix run github:siriobalmelli/flakem/master#switch-push-reset 192.168.42.43 internal-machine
+
+# timeout-loop waiting for successful ssh
+nix run github:siriobalmelli/flakem/master#ssh-wait my-host "uname -a"
 ```
 
 ### Include into a flake to deploy NixOS systems directly:

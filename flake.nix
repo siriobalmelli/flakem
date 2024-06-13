@@ -106,13 +106,6 @@
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
 
-          # build machine locally, apply remotely
-          "switch-push" = ''
-            nixos-rebuild switch \
-              ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
-              ${nixOpts} "''${NIX_OPTIONS[@]}"
-          '';
-
           # build machine remotely, apply remotely
           "switch-pull" = ''
             nixos-rebuild switch \
@@ -120,6 +113,47 @@
               --flake ".#$FLAKE_TARGET" \
               ${nixOpts} "''${NIX_OPTIONS[@]}"
           '';
+
+          # build machine locally, apply remotely
+          "switch-push" = ''
+            nixos-rebuild switch \
+              ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
+              ${nixOpts} "''${NIX_OPTIONS[@]}"
+          '';
+        }
+        // {
+          # timeout-loop waiting for successful ssh
+          ssh-wait = pkgs.writeShellApplication {
+            name = "ssh-wait";
+            runtimeInputs = [pkgs.openssh];
+            text = ''
+              while ! ssh -o connecttimeout=5 "$@"; do
+                echo "$(date) ssh-wait: $*"
+              done
+            '';
+          };
+
+          # switch-pull, followed by a reboot and a nix-collect-garbage
+          switch-pull-reset = pkgs.writeShellApplication {
+            name = "switch-pull-reset";
+            runtimeInputs = with self.packages.${pkgs.system}; [ssh-wait switch-pull];
+            text = ''
+              switch-pull "$@"
+              ssh-wait "$1" "sudo reboot"
+              ssh-wait "$1" "sudo nix-collect-garbage -d"
+            '';
+          };
+
+          # switch-push, followed by a reboot and a nix-collect-garbage
+          switch-push-reset = pkgs.writeShellApplication {
+            name = "switch-push-reset";
+            runtimeInputs = with self.packages.${pkgs.system}; [ssh-wait switch-push];
+            text = ''
+              switch-push "$@"
+              ssh-wait "$1" "sudo reboot"
+              ssh-wait "$1" "sudo nix-collect-garbage -d"
+            '';
+          };
         };
     });
 }
