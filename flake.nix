@@ -19,17 +19,43 @@
     inherit (flake-utils.lib) eachDefaultSystem;
   in
     {
+      nixosModules.default = {
+        config,
+        lib,
+        pkgs,
+        ...
+      }: let
+        cfg = config.packages.flakem;
+        inherit (lib) mkEnableOption mkIf;
+      in {
+        options.packages.flakem.enable = mkEnableOption "flakem tools";
+
+        config = mkIf cfg.enable {
+          nixpkgs.overlays = [self.overlays.default];
+          environment.systemPackages = with pkgs; [
+            build
+            build-there
+            ssh-wait
+            switch
+            switch-pull
+            switch-pull-reset
+            switch-push
+            switch-push-reset
+          ];
+        };
+      };
+
       overlays.default = final: prev: {
         inherit
           (prev.callPackage ./package.nix {inherit (prev.lib) makeScope;})
           build
           build-there
+          ssh-wait
           switch
           switch-pull
           switch-pull-reset
           switch-push
           switch-push-reset
-          ssh-wait
           ;
       };
     }
@@ -40,7 +66,7 @@
           overlays = [self.overlays.default];
         };
       in {
-        inherit (pkgs) build build-there switch switch-pull switch-pull-reset switch-push switch-push-reset ssh-wait;
+        inherit (pkgs) build build-there ssh-wait switch switch-pull switch-pull-reset switch-push switch-push-reset;
       };
     });
 }

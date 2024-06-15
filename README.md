@@ -72,14 +72,32 @@ nix run github:siriobalmelli/flakem/master#ssh-wait my-host "uname -a"
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, flakem }: let
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    flakem,
+  }: let
     inherit (flake-utils.lib) eachDefaultSystem;
   in
-    eachDefaultSystem (system: {
-      packages = {
-        inherit (flakem.packages.${system}) build build-there switch switch-push switch-pull
+    eachDefaultSystem (system: let
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [self.overlays.default];
       };
-    });
+    in {
+      packages = {
+        inherit (pkgs) build build-there ssh-wait switch switch-pull switch-pull-reset switch-push switch-push-reset;
+        # ... other packages here
+      };
+    })
+    // {
+      nixosConfigurations = {
+        bigmachine = nixpkgs.lib.nixosSystem {
+          # NixOS configuration
+        };
+      };
+    };
 }
 ```
 
@@ -90,6 +108,19 @@ Then, from that flake's directory:
 nix run .#switch-pull bigmachine
 
 # etc ...
+```
+
+### add flakem's tooling to system packages on a nixos
+
+```nix
+# called from a flake with 'specialArgs = { inherit inputs; };'
+{inputs, lib, ...}: with lib; {
+  imports = [
+    inputs.flakem.nixosModules.default
+  ];
+
+  packages.flakem.enable = mkDefault true;
+}
 ```
 
 ## A note on `nixos-rebuild`
