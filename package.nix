@@ -115,7 +115,7 @@ in
         name = "ssh-wait";
         runtimeInputs = [openssh];
         text = ''
-          while ! ssh -o connecttimeout=5 "$@"; do
+          while ! ssh -o ConnectTimeout=5 -o ServerAliveInterval=5 "$@"; do
             echo "$(date) ssh-wait: $*"
           done
         '';
