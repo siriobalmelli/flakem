@@ -128,7 +128,7 @@ in
         text = ''
           switch-pull "$@"
           ssh-wait "$1" "sudo reboot"
-          ssh-wait "$1" "sudo nix-collect-garbage -d"
+          ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
 
@@ -139,7 +139,7 @@ in
         text = ''
           switch-push "$@"
           ssh-wait "$1" "sudo reboot"
-          ssh-wait "$1" "sudo nix-collect-garbage -d"
+          ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
     })
