@@ -127,7 +127,7 @@ in
         runtimeInputs = with self; [ssh-wait switch-pull];
         text = ''
           switch-pull "$@"
-          ssh-wait "$1" "sudo reboot"
+          ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
           ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
@@ -138,7 +138,7 @@ in
         runtimeInputs = with self; [ssh-wait switch-push];
         text = ''
           switch-push "$@"
-          ssh-wait "$1" "sudo reboot"
+          ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
           ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
