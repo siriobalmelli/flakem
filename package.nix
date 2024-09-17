@@ -125,9 +125,10 @@ in
       switch-pull-reset = writeShellApplication {
         name = "switch-pull-reset";
         runtimeInputs = with self; [ssh-wait switch-pull];
-        text = ''
+        text = /*bash*/ ''
           switch-pull "$@"
           ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
+          sleep 1  # patience: sometimes machines will *still* allow reconnect
           ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
@@ -139,6 +140,7 @@ in
         text = ''
           switch-push "$@"
           ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
+          sleep 1  # patience: sometimes machines will *still* allow reconnect
           ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
         '';
       };
