@@ -40,6 +40,7 @@
             environment.systemPackages = with pkgs; [
               build
               build-there
+              ssh-deploy
               ssh-wait
               switch
               switch-pull
@@ -61,6 +62,7 @@
           switch-push
           switch-push-reset
           ;
+        ssh-deploy = prev.callPackage ./ssh-deploy.nix { };
       };
     }
     // eachDefaultSystem (system: {
@@ -75,6 +77,7 @@
           inherit (pkgs)
             build
             build-there
+            ssh-deploy
             ssh-wait
             switch
             switch-pull

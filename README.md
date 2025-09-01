@@ -54,6 +54,9 @@ nix run github:siriobalmelli/flakem/master#switch-push-reset 192.168.42.43 inter
 
 # timeout-loop waiting for successful ssh
 nix run github:siriobalmelli/flakem/master#ssh-wait my-host "uname -a"
+
+# decrypt and deploy a SOPS private key to a machine
+nix run github:siriobalmelli/flakem/master#ssh-deploy my-host
 ```
 
 ### Include into a flake to deploy NixOS systems directly:
@@ -87,7 +90,7 @@ nix run github:siriobalmelli/flakem/master#ssh-wait my-host "uname -a"
       };
     in {
       packages = {
-        inherit (pkgs) build build-there ssh-wait switch switch-pull switch-pull-reset switch-push switch-push-reset;
+        inherit (pkgs) build build-there ssh-deploy ssh-wait switch switch-pull switch-pull-reset switch-push switch-push-reset;
         # ... other packages here
       };
     })
