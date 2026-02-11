@@ -17,58 +17,67 @@ let
     use-substitutes = true;
   };
 
-  nixOpts = lib.cli.toCommandLineShellGNU { } {
+  nixosRebuildOpts = lib.cli.toCommandLineShellGNU { } {
     max-jobs = "auto";
     cores = 0;
   };
 
-  shellApp = name: commandLine: {
-    ${name} = writeShellApplication {
-      inherit name;
-      runtimeInputs = [
-        nixos-rebuild
-        nix
-      ];
-      text = ''
-        die() {
-          echo "$*" >&2
-          exit 1
-        }
+  shellApp =
+    name:
+    {
+      commandLine,
+      defaultHost ? "",
+    }:
+    {
+      ${name} = writeShellApplication {
+        inherit name;
+        runtimeInputs = [
+          nixos-rebuild
+          nix
+        ];
+        text = ''
+          die() {
+            echo "$*" >&2
+            exit 1
+          }
 
-        # detect OS for Darwin vs NixOS
-        OS_TYPE="$(uname -s)"
+          # detect OS for Darwin vs NixOS
+          OS_TYPE="$(uname -s)"
 
-        DEPLOY_HOST=
-        FLAKE_TARGET=
-        NIX_OPTIONS=( )
-        while [ "$#" -gt 0 ]; do
-          if [ -z "$DEPLOY_HOST" ]; then
-            DEPLOY_HOST="$1"
-            shift
-          elif [ "''${1:0:1}" = "-" ]; then
-            break;
-          elif [ -z "$FLAKE_TARGET" ]; then
-            FLAKE_TARGET="$1"
-            shift
-          else
-            break
-          fi
-        done
-        [ -z "$DEPLOY_HOST" ] && die "no target given"
-        [ -z "$FLAKE_TARGET" ] && FLAKE_TARGET="''${DEPLOY_HOST##*@}"  # remove a leading 'user@' stanza
-        NIX_OPTIONS=("''${@:1}")  # any remaining options are nix options
+          DEPLOY_HOST=
+          FLAKE_TARGET=
+          NIX_OPTIONS=( )
+          while [ "$#" -gt 0 ]; do
+            if [ -z "$DEPLOY_HOST" ]; then
+              DEPLOY_HOST="$1"
+              shift
+            elif [ "''${1:0:1}" = "-" ]; then
+              break;
+            elif [ -z "$FLAKE_TARGET" ]; then
+              FLAKE_TARGET="$1"
+              shift
+            else
+              break
+            fi
+          done
 
-        # avoid unused variable warnings
-        export DEPLOY_HOST
-        export FLAKE_TARGET
-        export NIX_OPTIONS
-        export OS_TYPE
-        set -x
+          DEPLOY_HOST="''${DEPLOY_HOST:-${defaultHost}}" # conditional default
+          [ -z "$DEPLOY_HOST" ] && die "no target given"
 
-        ${commandLine}
-      '';
+          [ -z "$FLAKE_TARGET" ] && FLAKE_TARGET="''${DEPLOY_HOST##*@}"  # remove a leading 'user@' stanza
+          NIX_OPTIONS=("''${@:1}")  # any remaining options are nix options
+
+          # avoid unused variable warnings
+          export DEPLOY_HOST
+          export FLAKE_TARGET
+          export NIX_OPTIONS
+          export OS_TYPE
+          set -x
+
+          ${commandLine}
+        '';
+      };
     };
-  };
 in
 makeScope newScope (
   self:
@@ -84,54 +93,66 @@ makeScope newScope (
   lib.concatMapAttrs shellApp {
     # build machine locally
     # ... remember `'$` escape oddity
-    "build" = ''
-      if [ "$OS_TYPE" = "Darwin" ]; then
-        nix build --no-link --print-out-paths \
-          ".#darwinConfigurations.$FLAKE_TARGET.system" \
-          ${nixOpts} "''${NIX_OPTIONS[@]}"
-      else
-        nixos-rebuild build \
-          ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-          ${nixOpts} "''${NIX_OPTIONS[@]}"
-      fi
-    '';
+    "build" = {
+      defaultHost = "$(hostname -s)";
+      commandLine = ''
+        if [ "$OS_TYPE" = "Darwin" ]; then
+          nix build --no-link --print-out-paths \
+            ".#darwinConfigurations.$FLAKE_TARGET.system" \
+            "''${NIX_OPTIONS[@]}"
+        else
+          nixos-rebuild build \
+            ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
+            ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+        fi
+      '';
+    };
 
     # build machine remotely
-    "build-there" = ''
-      nixos-rebuild build \
-        ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-        --flake ".#$FLAKE_TARGET" \
-        ${nixOpts} "''${NIX_OPTIONS[@]}"
-    '';
+    "build-there" = {
+      commandLine = ''
+        nixos-rebuild build \
+          ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
+          --flake ".#$FLAKE_TARGET" \
+          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+      '';
+    };
 
     # build machine locally, apply locally
-    "switch" = ''
-      if [ "$OS_TYPE" = "Darwin" ]; then
-        OUT_PATH=$(nix build --no-link --print-out-paths \
-          ".#darwinConfigurations.$FLAKE_TARGET.system" \
-          ${nixOpts} "''${NIX_OPTIONS[@]}")
-        "$OUT_PATH/activate"
-      else
-        nixos-rebuild switch \
-          ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-          ${nixOpts} "''${NIX_OPTIONS[@]}"
-      fi
-    '';
+    "switch" = {
+      defaultHost = "$(hostname -s)";
+      commandLine = ''
+        if [ "$OS_TYPE" = "Darwin" ]; then
+          OUT_PATH=$(nix build --no-link --print-out-paths \
+            ".#darwinConfigurations.$FLAKE_TARGET.system" \
+            "''${NIX_OPTIONS[@]}")
+          sudo "$OUT_PATH/activate"
+        else
+          nixos-rebuild switch \
+            ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
+            ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+        fi
+      '';
+    };
 
     # build machine remotely, apply remotely
-    "switch-pull" = ''
-      nixos-rebuild switch \
-        ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-        --flake ".#$FLAKE_TARGET" \
-        ${nixOpts} "''${NIX_OPTIONS[@]}"
-    '';
+    "switch-pull" = {
+      commandLine = ''
+        nixos-rebuild switch \
+          ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
+          --flake ".#$FLAKE_TARGET" \
+          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+      '';
+    };
 
     # build machine locally, apply remotely
-    "switch-push" = ''
-      nixos-rebuild switch \
-        ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
-        ${nixOpts} "''${NIX_OPTIONS[@]}"
-    '';
+    "switch-push" = {
+      commandLine = ''
+        nixos-rebuild switch \
+          ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
+          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+      '';
+    };
   }
   // {
     # timeout-loop waiting for successful ssh
