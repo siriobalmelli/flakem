@@ -40,6 +40,9 @@
             environment.systemPackages = with pkgs; [
               build
               build-there
+              hm-push
+              hm-pull
+              hm-switch
               ssh-deploy
               ssh-wait
               switch
@@ -51,10 +54,15 @@
           };
         };
 
+      darwinModules.default = self.nixosModules.default;
+
       overlays.default = final: prev: {
         inherit (prev.callPackage ./package.nix { inherit (prev.lib) makeScope; })
           build
           build-there
+          hm-push
+          hm-pull
+          hm-switch
           ssh-wait
           switch
           switch-pull
@@ -77,6 +85,9 @@
           inherit (pkgs)
             build
             build-there
+            hm-push
+            hm-pull
+            hm-switch
             ssh-deploy
             ssh-wait
             switch

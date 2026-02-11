@@ -7,15 +7,17 @@
 
   nixos-rebuild,
   openssh,
+  home-manager,
+  nix,
 }:
 let
-  rebuildOpts = lib.cli.toGNUCommandLineShell { } {
+  rebuildOpts = lib.cli.toCommandLineShellGNU { } {
     fast = true;
     use-remote-sudo = true;
     use-substitutes = true;
   };
 
-  nixOpts = lib.cli.toGNUCommandLineShell { } {
+  nixOpts = lib.cli.toCommandLineShellGNU { } {
     max-jobs = "auto";
     cores = 0;
   };
@@ -23,12 +25,18 @@ let
   shellApp = name: commandLine: {
     ${name} = writeShellApplication {
       inherit name;
-      runtimeInputs = [ nixos-rebuild ];
+      runtimeInputs = [
+        nixos-rebuild
+        nix
+      ];
       text = ''
         die() {
           echo "$*" >&2
           exit 1
         }
+
+        # detect OS for Darwin vs NixOS
+        OS_TYPE="$(uname -s)"
 
         DEPLOY_HOST=
         FLAKE_TARGET=
@@ -54,6 +62,7 @@ let
         export DEPLOY_HOST
         export FLAKE_TARGET
         export NIX_OPTIONS
+        export OS_TYPE
         set -x
 
         ${commandLine}
@@ -76,9 +85,15 @@ makeScope newScope (
     # build machine locally
     # ... remember `'$` escape oddity
     "build" = ''
-      nixos-rebuild build \
-        ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-        ${nixOpts} "''${NIX_OPTIONS[@]}"
+      if [ "$OS_TYPE" = "Darwin" ]; then
+        nix build --no-link --print-out-paths \
+          ".#darwinConfigurations.$FLAKE_TARGET.system" \
+          ${nixOpts} "''${NIX_OPTIONS[@]}"
+      else
+        nixos-rebuild build \
+          ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
+          ${nixOpts} "''${NIX_OPTIONS[@]}"
+      fi
     '';
 
     # build machine remotely
@@ -91,9 +106,16 @@ makeScope newScope (
 
     # build machine locally, apply locally
     "switch" = ''
-      nixos-rebuild switch \
-        ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-        ${nixOpts} "''${NIX_OPTIONS[@]}"
+      if [ "$OS_TYPE" = "Darwin" ]; then
+        OUT_PATH=$(nix build --no-link --print-out-paths \
+          ".#darwinConfigurations.$FLAKE_TARGET.system" \
+          ${nixOpts} "''${NIX_OPTIONS[@]}")
+        "$OUT_PATH/activate"
+      else
+        nixos-rebuild switch \
+          ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
+          ${nixOpts} "''${NIX_OPTIONS[@]}"
+      fi
     '';
 
     # build machine remotely, apply remotely
@@ -151,6 +173,116 @@ makeScope newScope (
         ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
         sleep 1  # patience: sometimes machines will *still* allow reconnect
         ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
+      '';
+    };
+
+    # home-manager switch locally
+    hm-switch = writeShellApplication {
+      name = "hm-switch";
+      runtimeInputs = [ home-manager ];
+      text = ''
+        die() {
+          echo "$*" >&2
+          exit 1
+        }
+
+        if [ "$#" -eq 0 ]; then
+          TARGET="$(whoami)@$(hostname -s)"
+        else
+          TARGET="$1"
+          shift
+        fi
+
+        set -x
+        home-manager switch --flake ".#$TARGET" "$@"
+      '';
+    };
+
+    # home-manager push: build locally, copy closure, activate remotely
+    hm-push = writeShellApplication {
+      name = "hm-push";
+      runtimeInputs = [
+        nix
+        openssh
+      ];
+      text = ''
+        die() {
+          echo "$*" >&2
+          exit 1
+        }
+
+        SSH_TARGET=
+        FLAKE_TARGET=
+        while [ "$#" -gt 0 ]; do
+          if [ -z "$SSH_TARGET" ]; then
+            SSH_TARGET="$1"
+            shift
+          elif [ "''${1:0:1}" = "-" ]; then
+            break
+          elif [ -z "$FLAKE_TARGET" ]; then
+            FLAKE_TARGET="$1"
+            shift
+          else
+            break
+          fi
+        done
+        [ -z "$SSH_TARGET" ] && die "usage: hm-push USER@HOST [FLAKE_TARGET] [NIX_OPTIONS]"
+
+        USER="''${SSH_TARGET%%@*}"
+        HOST="''${SSH_TARGET##*@}"
+        [ -z "$FLAKE_TARGET" ] && FLAKE_TARGET="$HOST"
+        NIX_OPTIONS=("''${@:1}")
+
+        set -x
+        OUT_PATH=$(nix build --no-link --print-out-paths \
+          ".#homeConfigurations.$USER@$FLAKE_TARGET.activationPackage" "''${NIX_OPTIONS[@]}")
+        nix copy --to "ssh://$SSH_TARGET" "$OUT_PATH"
+        # shellcheck disable=SC2029
+        ssh "$SSH_TARGET" "$OUT_PATH/activate"
+      '';
+    };
+
+    # home-manager pull: ssh to remote, build and activate there
+    hm-pull = writeShellApplication {
+      name = "hm-pull";
+      runtimeInputs = [ openssh ];
+      text = ''
+        die() {
+          echo "$*" >&2
+          exit 1
+        }
+
+        SSH_TARGET=
+        FLAKE_TARGET=
+        while [ "$#" -gt 0 ]; do
+          if [ -z "$SSH_TARGET" ]; then
+            SSH_TARGET="$1"
+            shift
+          elif [ "''${1:0:1}" = "-" ]; then
+            break
+          elif [ -z "$FLAKE_TARGET" ]; then
+            FLAKE_TARGET="$1"
+            shift
+          else
+            break
+          fi
+        done
+        [ -z "$SSH_TARGET" ] && die "usage: hm-pull USER@HOST [FLAKE_TARGET] [NIX_OPTIONS]"
+
+        USER="''${SSH_TARGET%%@*}"
+        HOST="''${SSH_TARGET##*@}"
+        [ -z "$FLAKE_TARGET" ] && FLAKE_TARGET="$HOST"
+        NIX_OPTIONS=("''${@:1}")
+
+        # build remote command with safe quoting
+        CMD="home-manager switch --flake '.#$USER@$FLAKE_TARGET'"
+        for opt in "''${NIX_OPTIONS[@]}"; do
+          CMD="$CMD $(printf '%q' "$opt")"
+        done
+
+        set -x
+        # shellcheck disable=SC2029
+        ssh "$SSH_TARGET" "$CMD"
       '';
     };
   }
