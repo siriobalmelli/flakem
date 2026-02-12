@@ -12,14 +12,9 @@
 }:
 let
   rebuildOpts = lib.cli.toCommandLineShellGNU { } {
-    fast = true;
-    use-remote-sudo = true;
+    no-reexec = true;
+    sudo = true;
     use-substitutes = true;
-  };
-
-  nixosRebuildOpts = lib.cli.toCommandLineShellGNU { } {
-    max-jobs = "auto";
-    cores = 0;
   };
 
   shellApp =
@@ -112,8 +107,7 @@ makeScope newScope (
       commandLine = ''
         nixos-rebuild build \
           ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-          --flake ".#$FLAKE_TARGET" \
-          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+          --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
       '';
     };
 
@@ -127,9 +121,7 @@ makeScope newScope (
             "''${NIX_OPTIONS[@]}")
           sudo "$OUT_PATH/activate"
         else
-          nixos-rebuild switch \
-            ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-            ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+          nixos-rebuild switch ${rebuildOpts} --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
         fi
       '';
     };
@@ -139,8 +131,7 @@ makeScope newScope (
       commandLine = ''
         nixos-rebuild switch \
           ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-          --flake ".#$FLAKE_TARGET" \
-          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+          --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
       '';
     };
 
@@ -148,8 +139,7 @@ makeScope newScope (
     "switch-push" = {
       commandLine = ''
         nixos-rebuild switch \
-          ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" \
-          ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+          ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
       '';
     };
   }
