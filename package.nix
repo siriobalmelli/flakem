@@ -96,15 +96,14 @@ makeScope newScope (
     "build" = {
       defaultHost = "$(hostname -s)";
       commandLine = ''
-        if [ "$OS_TYPE" = "Darwin" ]; then
-          nix build --no-link --print-out-paths \
-            ".#darwinConfigurations.$FLAKE_TARGET.system" \
-            "''${NIX_OPTIONS[@]}"
+        if [ "$(nix eval --json ".#darwinConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          ATTR="darwinConfigurations"
+        elif [ "$(nix eval --json ".#nixosConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          ATTR="nixosConfigurations"
         else
-          nixos-rebuild build \
-            ${rebuildOpts} --flake ".#$FLAKE_TARGET" \
-            ${nixosRebuildOpts} "''${NIX_OPTIONS[@]}"
+          die "Target '$FLAKE_TARGET' not found in darwinConfigurations or nixosConfigurations"
         fi
+        nix build --no-link --print-out-paths ".#$ATTR.$FLAKE_TARGET.config.system.build.toplevel" "''${NIX_OPTIONS[@]}"
       '';
     };
 
