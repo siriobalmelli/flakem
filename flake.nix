@@ -40,6 +40,7 @@
             environment.systemPackages = with pkgs; [
               build
               build-there
+              hm-build
               hm-push
               hm-pull
               hm-switch
@@ -60,6 +61,7 @@
         inherit (prev.callPackage ./package.nix { inherit (prev.lib) makeScope; })
           build
           build-there
+          hm-build
           hm-push
           hm-pull
           hm-switch
@@ -85,6 +87,7 @@
           inherit (pkgs)
             build
             build-there
+            hm-build
             hm-push
             hm-pull
             hm-switch

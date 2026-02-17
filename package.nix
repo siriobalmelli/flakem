@@ -186,6 +186,29 @@ makeScope newScope (
       '';
     };
 
+    # home-manager build locally (no activation)
+    hm-build = writeShellApplication {
+      name = "hm-build";
+      runtimeInputs = [ nix ];
+      text = ''
+        die() {
+          echo "$*" >&2
+          exit 1
+        }
+
+        if [ "$#" -eq 0 ]; then
+          TARGET="$(whoami)@$(hostname -s)"
+        else
+          TARGET="$1"
+          shift
+        fi
+
+        set -x
+        nix build --no-link --print-out-paths \
+          ".#homeConfigurations.$TARGET.activationPackage" "$@"
+      '';
+    };
+
     # home-manager switch locally
     hm-switch = writeShellApplication {
       name = "hm-switch";
