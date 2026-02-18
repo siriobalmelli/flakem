@@ -5,8 +5,19 @@ Lightweight tooling for NixOS and Darwin systems declared in Flakes.
 ## Architecture
 
 Wraps `nixos-rebuild`, `nix-darwin`, and `home-manager` into unified commands like `build`, `switch`, `switch-pull`.
-Auto-detects OS (Linux vs Darwin) to choose the correct backend (`nixos-rebuild` vs `nix build`).
 Defined primarily in [`package.nix`](package.nix).
+
+### OS Detection Strategy
+
+- **Local commands** (`build`, `switch`): Use `uname -s` to detect the running OS.
+- **Remote commands** (`switch-push`, `switch-pull`): Use `nix eval` to check if the target exists in `darwinConfigurations` or `nixosConfigurations` (since the remote OS may differ from local).
+
+### Remote Operations
+
+- **NixOS targets**: Delegate to `nixos-rebuild` with `--target-host`.
+- **Darwin targets**:
+  - **Push**: Build locally → `nix copy` closure to remote → SSH trigger activation (matches `hm-push` pattern).
+  - **Pull**: SSH to remote → build and activate there. **Requires flake source on remote.**
 
 ## Extension Protocols
 
@@ -26,3 +37,5 @@ To add a new command (e.g., `hm-build`):
 ## Invariants
 
 - **`nix build` vs `nixos-rebuild` flags**: `nix build` (used for Darwin) does NOT accept `--cores` or `--max-jobs`. These flags must be scoped strictly to `nixos-rebuild` invocations via [`nixosRebuildOpts`](package.nix#L20) and never applied globally to all nix commands.
+- **Remote Ops Dependencies**: `openssh` must be in `shellApp` `runtimeInputs` to support `nix copy --to ssh://` and remote activation commands.
+- **Darwin Pull Constraint**: Unlike NixOS, `switch-pull` for Darwin cannot copy the flake source; it assumes the source is already present and synced on the remote machine.
