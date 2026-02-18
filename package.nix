@@ -29,6 +29,7 @@ let
         runtimeInputs = [
           nixos-rebuild
           nix
+          openssh
         ];
         text = ''
           die() {
@@ -129,17 +130,43 @@ makeScope newScope (
     # build machine remotely, apply remotely
     "switch-pull" = {
       commandLine = ''
-        nixos-rebuild switch \
-          ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
-          --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
+        if [ "$(nix eval --json ".#darwinConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          # Darwin: SSH to remote, build and activate there
+          # NOTE: assumes flake source is available on remote (user must sync it)
+          CMD="OUT_PATH=\$(nix build --no-link --print-out-paths '.#darwinConfigurations.$FLAKE_TARGET.system'"
+          for opt in "''${NIX_OPTIONS[@]}"; do
+            CMD="$CMD $(printf '%q' "$opt")"
+          done
+          CMD="$CMD) && sudo \"\$OUT_PATH/activate\""
+          # shellcheck disable=SC2029
+          ssh -t "$DEPLOY_HOST" "$CMD"
+        elif [ "$(nix eval --json ".#nixosConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          nixos-rebuild switch \
+            ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
+            --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
+        else
+          die "Target '$FLAKE_TARGET' not found in darwinConfigurations or nixosConfigurations"
+        fi
       '';
     };
 
     # build machine locally, apply remotely
     "switch-push" = {
       commandLine = ''
-        nixos-rebuild switch \
-          ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
+        if [ "$(nix eval --json ".#darwinConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          # Darwin: build locally, copy closure, activate remotely
+          OUT_PATH=$(nix build --no-link --print-out-paths \
+            ".#darwinConfigurations.$FLAKE_TARGET.system" \
+            "''${NIX_OPTIONS[@]}")
+          nix copy --to "ssh://$DEPLOY_HOST" "$OUT_PATH"
+          # shellcheck disable=SC2029
+          ssh -t "$DEPLOY_HOST" "sudo $OUT_PATH/activate"
+        elif [ "$(nix eval --json ".#nixosConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
+          nixos-rebuild switch \
+            ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
+        else
+          die "Target '$FLAKE_TARGET' not found in darwinConfigurations or nixosConfigurations"
+        fi
       '';
     };
   }
