@@ -22,6 +22,7 @@ let
     {
       commandLine,
       defaultHost ? "",
+      withAction ? false,
     }:
     {
       ${name} = writeShellApplication {
@@ -43,6 +44,14 @@ let
           DEPLOY_HOST=
           FLAKE_TARGET=
           NIX_OPTIONS=( )
+          ${lib.optionalString withAction ''
+            # optional leading action before HOST: "switch" (default) or "boot"
+            ACTION=switch
+            if [ "$#" -ge 1 ] && { [ "$1" = "switch" ] || [ "$1" = "boot" ]; }; then
+              ACTION="$1"; shift
+            fi
+            export ACTION
+          ''}
           while [ "$#" -gt 0 ]; do
             if [ -z "$DEPLOY_HOST" ]; then
               DEPLOY_HOST="$1"
@@ -130,6 +139,7 @@ makeScope newScope (
 
     # build machine remotely, apply remotely
     "switch-pull" = {
+      withAction = true;
       commandLine = ''
         if [ "$(nix eval --json ".#darwinConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
           # Darwin: SSH to remote, build and activate there
@@ -142,7 +152,7 @@ makeScope newScope (
           # shellcheck disable=SC2029
           ssh -t "$DEPLOY_HOST" "$CMD"
         elif [ "$(nix eval --json ".#nixosConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
-          nixos-rebuild switch \
+          nixos-rebuild "$ACTION" \
             ${rebuildOpts} --build-host "$DEPLOY_HOST" --target-host "$DEPLOY_HOST" \
             --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
         else
@@ -153,6 +163,7 @@ makeScope newScope (
 
     # build machine locally, apply remotely
     "switch-push" = {
+      withAction = true;
       commandLine = ''
         if [ "$(nix eval --json ".#darwinConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
           # Darwin: build locally, copy closure, activate remotely
@@ -163,13 +174,14 @@ makeScope newScope (
           # shellcheck disable=SC2029
           ssh -t "$DEPLOY_HOST" "sudo nix-env -p /nix/var/nix/profiles/system --set $OUT_PATH && sudo $OUT_PATH/activate"
         elif [ "$(nix eval --json ".#nixosConfigurations" --apply "x: x ? \"$FLAKE_TARGET\"")" = "true" ]; then
-          nixos-rebuild switch \
+          nixos-rebuild "$ACTION" \
             ${rebuildOpts} --target-host "$DEPLOY_HOST" --flake ".#$FLAKE_TARGET" "''${NIX_OPTIONS[@]}"
         else
           die "Target '$FLAKE_TARGET' not found in darwinConfigurations or nixosConfigurations"
         fi
       '';
     };
+
   }
   // {
     # timeout-loop waiting for successful ssh
@@ -192,7 +204,7 @@ makeScope newScope (
       ];
       text = # bash
         ''
-          switch-pull "$@"
+          switch-pull boot "$@"
           ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
           sleep 1  # patience: sometimes machines will *still* allow reconnect
           ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
@@ -207,7 +219,7 @@ makeScope newScope (
         switch-push
       ];
       text = ''
-        switch-push "$@"
+        switch-push boot "$@"
         ssh "$1" "sudo reboot && while echo \"\$(date): waiting for reboot\"; do sleep 1; done" || true
         sleep 1  # patience: sometimes machines will *still* allow reconnect
         ssh-wait "$1" "sudo nix-collect-garbage --delete-older-than 15d"
