@@ -32,9 +32,18 @@ nix run github:nix-community/nixos-anywhere -- \
 ### System commands (NixOS and Darwin)
 
 The `build` and `switch` commands auto-detect Darwin hosts via `uname -s`
-and use `nix build .#darwinConfigurations...` + `./result/activate` instead of `nixos-rebuild`.
+and use `nix build .#darwinConfigurations...` instead of `nixos-rebuild`.
+Darwin `switch` updates `/nix/var/nix/profiles/system` before activating.
 
-Remote commands (`build-there`, `switch-push`, `switch-pull`, etc.) are NixOS-only.
+`build-there` is NixOS-only.
+`switch-push` and `switch-pull` support NixOS and Darwin targets declared
+in the flake.
+
+`switch-pull` and `switch-push` accept an optional leading action:
+`switch` activates the target immediately.
+`boot` sets the next NixOS boot generation without activating it.
+If no action is given, they default to `switch`.
+Darwin remote commands always activate, even if `boot` is supplied.
 
 ```bash
 # build machine locally (auto-detects NixOS or Darwin)
@@ -46,16 +55,22 @@ nix run github:siriobalmelli/flakem/master#switch $(hostname)
 # build machine remotely (NixOS only)
 nix run github:siriobalmelli/flakem/master#build-there bigmachine  # can also be 'myuser@bigmachine'
 
-# build machine remotely, apply remotely (NixOS only)
+# build machine remotely, apply remotely
 nix run github:siriobalmelli/flakem/master#switch-pull myuser@bigmachine  # can also be 'bigmachine'
 
-# build machine locally, apply remotely (NixOS only)
+# build machine remotely, set as next boot generation without activating
+nix run github:siriobalmelli/flakem/master#switch-pull boot myuser@bigmachine
+
+# build machine locally, apply remotely
 nix run github:siriobalmelli/flakem/master#switch-push bigmachine  # can also be 'myuser@bigmachine'
 
-# switch-pull, followed by a reboot and a nix-collect-garbage
+# build machine locally, set as next boot generation without activating
+nix run github:siriobalmelli/flakem/master#switch-push boot bigmachine
+
+# switch-pull boot, followed by a reboot and a nix-collect-garbage
 nix run github:siriobalmelli/flakem/master#switch-pull-reset root@10.3.2.1 another-machine
 
-# switch-push, followed by a reboot and a nix-collect-garbage
+# switch-push boot, followed by a reboot and a nix-collect-garbage
 nix run github:siriobalmelli/flakem/master#switch-push-reset 192.168.42.43 internal-machine
 
 # timeout-loop waiting for successful ssh
